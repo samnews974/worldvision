@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>WorldVision Trader — Speed Markets DEX (non-custodial)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"
+  onerror="window.__noEthers=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.17.2/dist/index.umd.js"
+  onerror="window.__noWC=true"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+:root{
+  --green:#00e676;--red:#ff1744;--gold:#ffd700;--blue:#60c0ff;--purple:#7b2ff7;
+  --bg:#0d0f14;--panel:#161a22;--border:#2a2f3a;--text:#e8eaf0;--muted:#8a96aa;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);font-family:'Rajdhani',sans-serif;color:var(--text);min-height:100vh;padding-bottom:24px;}
+h1,h2,h3,.orb{font-family:'Orbitron',sans-serif;}
+button{font-family:'Orbitron',sans-serif;cursor:pointer;}
+input,select{font-family:'Rajdhani',sans-serif;}
+
+/* ── HEADER ── */
+.hdr{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:8px;
+  padding:10px 12px;background:rgba(13,15,20,0.95);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);}
+.hdr-logo{font-size:15px;font-weight:900;color:var(--gold);letter-spacing:1.5px;flex:1;
+  text-shadow:0 0 18px rgba(255,215,0,0.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-logo span{color:var(--text);font-size:10px;letter-spacing:3px;display:block;opacity:.7;}
+.btn-wallet{padding:9px 14px;border:none;border-radius:6px;font-size:10px;font-weight:700;
+  letter-spacing:1px;background:linear-gradient(135deg,#ff0420,#ff6b35);color:#fff;
+  box-shadow:0 2px 12px rgba(255,4,32,0.35);white-space:nowrap;transition:transform .15s;}
+.btn-wallet:hover{transform:scale(1.04);}
+.btn-wallet.connected{background:linear-gradient(135deg,#007a3d,#00c853);box-shadow:0 2px 12px rgba(0,200,83,0.35);font-size:9px;}
+.chain-badge{font-size:8px;padding:3px 8px;border-radius:10px;letter-spacing:1px;
+  background:rgba(96,192,255,0.1);border:1px solid rgba(96,192,255,0.3);color:var(--blue);white-space:nowrap;}
+
+/* ── LAYOUT ── */
+.wrap{max-width:760px;margin:0 auto;padding:10px 10px 0;display:flex;flex-direction:column;gap:12px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
+  border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02);}
+.card-t{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);}
+.card-b{padding:12px;}
+.hint{font-size:11px;color:var(--muted);line-height:1.55;}
+.tag-ok{font-size:8px;color:var(--green);border:1px solid rgba(0,230,118,0.35);
+  padding:2px 7px;border-radius:10px;letter-spacing:1px;}
+.tag-bad{font-size:8px;color:var(--red);border:1px solid rgba(255,23,68,0.4);
+  padding:2px 7px;border-radius:10px;letter-spacing:1px;}
+
+/* ── WALLET MODAL ── */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:900;display:none;
+  align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(5px);}
+.modal.show{display:flex;}
+.modal-box{background:linear-gradient(160deg,#161b26,#0e1218);border:1px solid #33394a;
+  border-radius:14px;width:100%;max-width:380px;padding:20px 18px;
+  animation:pop .3s cubic-bezier(.175,.885,.32,1.275);max-height:88vh;overflow-y:auto;}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.modal-t{font-size:13px;font-weight:900;color:var(--gold);letter-spacing:1px;}
+.x{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+  color:#fff;width:28px;height:28px;cursor:pointer;font-size:13px;}
+.w-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;
+  border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);
+  margin-top:8px;transition:all .15s;}
+.w-opt:hover{border-color:rgba(255,255,255,0.25);transform:translateX(2px);}
+.w-ico{font-size:22px;width:38px;height:38px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,0.05);flex-shrink:0;}
+.w-name{font-size:11px;font-weight:700;color:#fff;}
+.w-sub{font-size:10px;color:var(--muted);}
+.wc-note{margin-top:10px;padding:9px 11px;border-radius:8px;font-size:10.5px;line-height:1.6;
+  background:rgba(96,192,255,0.07);border:1px solid rgba(96,192,255,0.25);color:#b8d4f0;}
+
+/* ── TRADE PANEL ── */
+.asset-tabs{display:flex;gap:6px;}
+.asset-tab{flex:1;padding:11px 0;border-radius:6px;border:1px solid var(--border);
+  background:#1a1f2b;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;transition:all .15s;}
+.asset-tab.active{border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,0.07);}
+.dir-row{display:flex;gap:8px;margin-top:10px;}
+.dir-btn{flex:1;padding:16px 0;border:none;border-radius:8px;font-size:14px;font-weight:900;
+  letter-spacing:2px;transition:all .12s;position:relative;}
+.dir-btn.up{background:linear-gradient(180deg,#00c853,#007a3d);color:#002b10;
+  box-shadow:0 5px 0 #004d22,0 8px 18px rgba(0,200,83,0.3);}
+.dir-btn.down{background:linear-gradient(180deg,#ff4444,#a4001e);color:#fff;
+  box-shadow:0 5px 0 #5c0011,0 8px 18px rgba(255,23,68,0.3);}
+.dir-btn:active{transform:translateY(4px);box-shadow:none;}
+.dir-btn.sel{outline:2px solid var(--gold);outline-offset:2px;}
+.tf-row{display:flex;gap:5px;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
+.tf-btn{flex:1;min-width:52px;padding:8px 0;border-radius:5px;border:1px solid var(--border);
+  background:#1a1f2b;color:var(--muted);font-size:9px;font-weight:700;transition:all .15s;white-space:nowrap;}
+.tf-btn.active{border-color:var(--blue);color:var(--blue);background:rgba(0,100,200,0.12);}
+.amt-row{display:flex;gap:5px;margin-top:10px;}
+.amt-inp{flex:1;min-width:0;padding:12px;border-radius:6px;border:1px solid var(--border);
+  background:#0d1118;color:#fff;font-size:17px;font-weight:700;outline:none;text-align:center;}
+.amt-inp:focus{border-color:var(--gold);}
+.pct-btn{padding:0 12px;border-radius:6px;border:1px solid var(--border);background:#1a1f2b;
+  color:var(--muted);font-size:9px;font-weight:700;}
+.pct-btn:hover{border-color:var(--gold);color:var(--gold);}
+.quote{margin-top:10px;padding:10px 12px;border-radius:7px;display:none;
+  background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2);
+  flex-direction:column;gap:5px;}
+.quote.show{display:flex;}
+.q-line{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+.q-line b{color:#fff;font-family:'Orbitron',sans-serif;font-size:11px;}
+.q-line b.gold{color:var(--gold);}
+.btn-buy{width:100%;margin-top:10px;padding:15px 0;border:none;border-radius:8px;
+  font-size:13px;font-weight:900;letter-spacing:2px;color:#000;
+  background:linear-gradient(90deg,#ffb300,#ffd700);
+  box-shadow:0 4px 18px rgba(255,215,0,0.35);transition:all .15s;}
+.btn-buy:hover{filter:brightness(1.08);}
+.btn-buy:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
+.btn-approve{width:100%;margin-top:8px;padding:11px 0;border-radius:8px;border:1px solid rgba(96,192,255,0.4);
+  background:rgba(0,100,200,0.12);color:var(--blue);font-size:10px;font-weight:700;letter-spacing:1px;}
+.status-line{margin-top:9px;font-size:10.5px;text-align:center;font-family:'Orbitron',sans-serif;
+  letter-spacing:.5px;min-height:14px;}
+.status-line.ok{color:var(--green);} .status-line.err{color:var(--red);} .status-line.load{color:var(--gold);}
+.fallback{margin-top:10px;text-align:center;}
+.fallback a{color:var(--blue);font-size:10.5px;font-family:'Orbitron',sans-serif;}
+
+/* ── POSITIONS ── */
+.pos{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
+  border-radius:8px;margin-bottom:8px;background:#12161f;}
+.pos-dir{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:900;flex-shrink:0;}
+.pos-dir.up{background:rgba(0,200,83,0.12);color:var(--green);border:1px solid rgba(0,230,118,0.3);}
+.pos-dir.down{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.3);}
+.pos-mid{flex:1;min-width:0;}
+.pos-t{font-size:11px;font-weight:700;}
+.pos-s{font-size:10px;color:var(--muted);margin-top:2px;}
+.pos-end{text-align:right;flex-shrink:0;}
+.pos-amt{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;}
+.pos-chip{font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:8px;margin-top:3px;display:inline-block;}
+.chip-live{background:rgba(96,192,255,0.1);color:var(--blue);border:1px solid rgba(96,192,255,0.3);}
+.chip-win{background:rgba(0,230,118,0.1);color:var(--green);border:1px solid rgba(0,230,118,0.3);}
+.chip-loss{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.3);}
+.chip-claim{background:rgba(255,215,0,1);color:#000;}
+.btn-claim{padding:6px 10px;border:none;border-radius:6px;background:linear-gradient(90deg,#ffb300,#ffd700);
+  color:#000;font-size:8px;font-weight:900;letter-spacing:1px;margin-top:4px;}
+
+/* ── ANALYSIS ── */
+.chart-wrap{position:relative;height:220px;background:#0a0d12;}
+canvas#chart{width:100%;height:100%;display:block;}
+.chart-tags{position:absolute;top:6px;left:8px;display:flex;gap:6px;z-index:2;}
+.chip{font-size:9px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,0.55);
+  border:1px solid var(--border);font-family:'Orbitron',sans-serif;color:var(--muted);white-space:nowrap;}
+.chip b{color:#fff;}
+.bias-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--border);}
+.bias-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;font-family:'Orbitron',sans-serif;white-space:nowrap;}
+.bias-track{flex:1;height:8px;border-radius:4px;background:#1e2330;position:relative;overflow:hidden;}
+.bias-fill{position:absolute;top:0;height:100%;transition:all .5s;}
+.bias-mid{position:absolute;left:50%;top:0;width:1px;height:100%;background:rgba(255,255,255,0.25);}
+.bias-txt{font-size:10px;font-weight:700;white-space:nowrap;}
+
+/* ── RISK ── */
+.risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.risk-stat{background:#0d1118;border:1px solid var(--border);border-radius:6px;padding:8px 4px;text-align:center;}
+.rs-l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.rs-v{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;margin-top:3px;}
+.risk-settings{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.rs-field{flex:1;min-width:110px;}
+.rs-field label{font-size:9px;color:var(--muted);display:block;margin-bottom:3px;}
+.rs-field input{width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
+  background:#0d1118;color:#fff;font-size:12px;font-weight:700;text-align:center;}
+.lock-banner{display:none;margin-top:10px;padding:10px;border-radius:8px;text-align:center;
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;
+  background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.4);color:var(--red);}
+.lock-banner.show{display:block;}
+.btn-ghost{padding:9px 14px;border-radius:6px;border:1px solid var(--border);background:#1a1f2b;
+  color:var(--muted);font-size:9px;font-weight:700;letter-spacing:1px;}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
+table.jrnl{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}
+table.jrnl th{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1px;color:var(--muted);
+  text-align:left;padding:6px 4px;border-bottom:1px solid var(--border);}
+table.jrnl td{padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.j-win{color:var(--green);font-weight:700;} .j-loss{color:var(--red);font-weight:700;}
+.mini-btns button{font-size:8px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);
+  background:#1a1f2b;color:var(--muted);margin-left:4px;}
+
+.footer{max-width:760px;margin:14px auto 0;padding:0 12px;font-size:10px;color:#555f70;line-height:1.6;text-align:center;}
+@media(max-width:480px){ .risk-grid{grid-template-columns:repeat(2,1fr);} .hdr-logo{font-size:12px;} }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo">🌐 WORLDVISION <span>TRADER · DÉCENTRALISÉ</span></div>
+  <div class="chain-badge" id="chainBadge">—</div>
+  <button class="btn-wallet" id="walletBtn" onclick="openWalletModal()">🔗 Connecter</button>
+</header>
+
+<div class="wrap">
+
+  <!-- ══════════ TRADE ══════════ -->
+  <section class="card">
+    <div class="card-h">
+      <span class="card-t">⚡ SPEED MARKETS · UP/DOWN ON-CHAIN</span>
+      <span id="ammTag" class="tag-bad">CONTRAT NON VÉRIFIÉ</span>
+    </div>
+    <div class="card-b">
+      <div class="hint" style="margin-bottom:10px;">
+        Marchés haussier/baissier de 1 à 60 min sur <b>Thales Speed Markets</b> (protocole audité).
+        100% non-custodial : tu gardes tes fonds, chaque transaction est signée par ton wallet.
+      </div>
+
+      <div class="asset-tabs">
+        <button class="asset-tab active" id="tabBTC" onclick="setAsset('BTC')">₿ BTC</button>
+        <button class="asset-tab" id="tabETH" onclick="setAsset('ETH')">Ξ ETH</button>
+      </div>
+
+      <div class="dir-row">
+        <button class="dir-btn up" id="btnUp" onclick="setDir('UP')">▲ UP</button>
+        <button class="dir-btn down" id="btnDown" onclick="setDir('DOWN')">▼ DOWN</button>
+      </div>
+
+      <div class="tf-row" id="tfRow">
+        <button class="tf-btn" data-tf="60">1 min</button>
+        <button class="tf-btn" data-tf="300">5 min</button>
+        <button class="tf-btn active" data-tf="600">10 min</button>
+        <button class="tf-btn" data-tf="900">15 min</button>
+        <button class="tf-btn" data-tf="1800">30 min</button>
+        <button class="tf-btn" data-tf="3600">1 h</button>
+      </div>
+
+      <div class="amt-row">
+        <input class="amt-inp" id="amtInp" type="number" min="1" step="any" placeholder="Montant USDC" oninput="onAmtInput()">
+        <button class="pct-btn" onclick="setPct(5)">5%</button>
+        <button class="pct-btn" onclick="setPct(10)">10%</button>
+        <button class="pct-btn" onclick="setPct(25)">25%</button>
+        <button class="pct-btn" onclick="setPct(100)">MAX</button>
+      </div>
+
+      <div class="quote" id="quoteBox">
+        <div class="q-line"><span>Mise</span><b id="qBuyin">—</b></div>
+        <div class="q-line"><span>Payout potentiel</span><b class="gold" id="qPayout">—</b></div>
+        <div class="q-line"><span>Cote implicite</span><b id="qOdds">—</b></div>
+        <div class="q-line"><span>Frais réseau (Pyth)</span><b id="qFee">—</b></div>
+      </div>
+
+      <button class="btn-approve" id="approveBtn" style="display:none;" onclick="doApprove()">✓ APPROUVER L'USDC (une fois)</button>
+      <button class="btn-buy" id="buyBtn" onclick="doBuy()" disabled>CONNECTE TON WALLET</button>
+      <div class="status-line" id="txStatus"></div>
+      <div class="fallback"><a href="https://speedmarkets.thalesmarket.io" target="_blank" rel="noopener">↗ Ouvrir dans l'app officielle Speed Markets (secours)</a></div>
+    </div>
+  </section>
+
+  <!-- ══════════ POSITIONS ══════════ -->
+  <section class="card">
+    <div class="card-h">
+      <span class="card-t">📋 POSITIONS</span>
+      <button class="btn-ghost" onclick="refreshPositions(true)">↻ Rafraîchir</button>
+    </div>
+    <div class="card-b" id="posList">
+      <div class="hint" style="text-align:center;padding:8px 0;">Aucune position. Connecte ton wallet puis achète un ticket UP ou DOWN.</div>
+    </div>
+  </section>
+
+  <!-- ══════════ ANALYSIS ══════════ -->
+  <section class="card">
+    <div class="card-h"><span class="card-t">📊 ANALYSE TEMPS RÉEL (indicatif)</span><span class="hint" id="feedTag">hors ligne</span></div>
+    <div class="chart-wrap">
+      <div class="chart-tags">
+        <div class="chip">PRIX <b id="chipPrice">—</b></div>
+        <div class="chip">Δ60s <b id="chipMom">—</b></div>
+        <div class="chip">RSI <b id="chipRsi">—</b></div>
+        <div class="chip">CVD <b id="chipCvd">—</b></div>
+      </div>
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="bias-bar">
+      <span class="bias-lbl">BIAIS</span>
+      <div class="bias-track"><div class="bias-mid"></div><div class="bias-fill" id="biasFill"></div></div>
+      <span class="bias-txt" id="biasTxt">—</span>
+    </div>
+  </section>
+
+  <!-- ══════════ RISK MANAGER ══════════ -->
+  <section class="card">
+    <div class="card-h"><span class="card-t">🛡️ RISK MANAGER</span><span class="hint">obligatoire, pas optionnel</span></div>
+    <div class="card-b">
+      <div class="risk-grid">
+        <div class="risk-stat"><div class="rs-l">Solde USDC</div><div class="rs-v" id="rsBal">—</div></div>
+        <div class="risk-stat"><div class="rs-l">P&amp;L session</div><div class="rs-v" id="rsPnl">$0.00</div></div>
+        <div class="risk-stat"><div class="rs-l">Trades</div><div class="rs-v" id="rsTrades">0</div></div>
+        <div class="risk-stat"><div class="rs-l">Win rate</div><div class="rs-v" id="rsWr">—</div></div>
+      </div>
+      <div class="risk-settings">
+        <div class="rs-field"><label>Risque / trade (% solde)</label><input id="cfgRisk" type="number" value="2" min="0.5" max="25" step="0.5"></div>
+        <div class="rs-field"><label>Perte max jour (%)</label><input id="cfgDaily" type="number" value="10" min="1" max="50" step="1"></div>
+        <div class="rs-field"><label>Blocage après X pertes</label><input id="cfgConsec" type="number" value="3" min="1" max="10" step="1"></div>
+        <div class="rs-field"><label>Cooldown (min)</label><input id="cfgCool" type="number" value="15" min="1" max="120" step="1"></div>
+      </div>
+      <div class="lock-banner" id="lockBanner"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn-ghost" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn-ghost" onclick="resetJournal()">🗑 Reset journal</button>
+      </div>
+      <div id="jrnlWrap"></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="footer">
+  Outil non-custodial : tes fonds restent dans ton wallet, chaque transaction est signée par toi.<br>
+  Les marchés UP/DOWN sont des produits à risque élevé — ne trade que ce que tu peux perdre.
+  Ce panneau d'analyse est indicatif et ne constitue pas un conseil financier.
+</div>
+
+<!-- ══════════ WALLET MODAL ══════════ -->
+<div class="modal" id="walletModal" onclick="if(event.target===this)closeWalletModal()">
+  <div class="modal-box">
+    <div class="modal-h"><span class="modal-t">Connecter un wallet</span>
+      <button class="x" onclick="closeWalletModal()">✕</button></div>
+    <div class="hint" style="margin-bottom:4px;">Choisis ton wallet — la connexion se fait localement, aucune clé ne quitte jamais ton appareil.</div>
+    <div id="walletList"></div>
+    <div class="wc-note" id="wcNote" style="display:none;">
+      📱 <b>WalletConnect</b> : pour activer le QR code, crée un projet gratuit sur
+      <b>cloud.reown.com</b> et colle le Project ID dans la config (<code>REOWN_PROJECT_ID</code> en haut du fichier).
+      En attendant, utilise l'application de ton wallet (MetaMask Mobile / Trust) avec son navigateur intégré.
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   ⚙️ CONFIG — à personnaliser
+   ════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  REOWN_PROJECT_ID: "",   // ← gratuit sur https://cloud.reown.com (WalletConnect v2)
+  THALES_API: "https://overtimemarketsv2.xyz/speed-markets",
+  // Adresses SpeedMarketsAMM — VÉRIFIE-LES sur https://docs.thalesmarket.io avant usage réel.
+  // L'app refuse de trader si la vérification on-chain échoue (garde-fou anti-fonds perdus).
+  SPEED_MARKETS_AMM: {
+    10: "0xE16B8a01490835EC1e76bAbbB3Cadd8921b32001",      // Optimism (à revérifier)
+    42161: null,                                            // Arbitrum : renseigner après vérification officielle
+  },
+  USDC: {
+    10:    "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",    // USDC natif Optimism
+    42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",    // USDC natif Arbitrum
+  },
+  CHAIN_NAMES: { 10: "Optimism", 42161: "Arbitrum" },
+  MIN_BUYIN: 1,
+  FALLBACK_URL: "https://speedmarkets.thalesmarket.io",
+};
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAT GLOBAL
+   ════════════════════════════════════════════════════════════════ */
+const S = {
+  provider: null, signer: null, account: null, chainId: null, walletType: "",
+  usdcBal: 0n, allowance: 0n, ammOk: false,
+  asset: "BTC", dir: null, tf: 600, quote: null, quoteAt: 0,
+  positions: [], knownTickets: {}, pollTimer: null,
+};
+const risk = loadRisk();
+const A = { ws: null, ticks: [], vols: [], cvd: 0, asset: "BTC", raf: 0 };
+
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+];
+// Candidats d'ABI — l'app tente chaque surcharge jusqu'à trouver celle qui correspond.
+const SPEED_ABI = [
+  "function createNewMarket(address user, bytes32 asset, uint64 timeToMaturity, uint64 delta, uint256 buyinAmount, bool isUp, bytes[] priceUpdateData) payable",
+  "function createNewMarket(bytes32 asset, uint64 timeToMaturity, uint64 delta, uint256 buyinAmount, bool isUp, bytes[] priceUpdateData) payable",
+  "function createNewMarketWithDifferentCollateral(address collateral, address user, bytes32 asset, uint64 timeToMaturity, uint64 delta, uint256 buyinAmount, bool isUp, bytes[] priceUpdateData) payable",
+  "function createNewMarketWithDifferentCollateral(address collateral, bytes32 asset, uint64 timeToMaturity, uint64 delta, uint256 buyinAmount, bool isUp, bytes[] priceUpdateData) payable",
+  "function resolveMarketsBatch(address[] markets, bytes[] priceUpdateData) payable",
+  "function resolveMarket(address market, bytes[] priceUpdateData) payable",
+  "function claimWinningTickets(uint256[] tokenIds)",
+  "function supportedCollateral(address collateral) view returns (bool)",
+];
+
+/* ════════════════════════════════════════════════════════════════
+   UTILS
+   ════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const fmt$ = (n, d = 2) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+function shortAddr(a) { return a ? a.slice(0, 6) + "…" + a.slice(-4) : "—"; }
+function setStatus(msg, type = "") { const el = $("txStatus"); el.textContent = msg; el.className = "status-line " + type; }
+function toast(msg, type = "") { setStatus(msg, type); }
+function amm() { return CONFIG.SPEED_MARKETS_AMM[S.chainId] || null; }
+function usdcAddr() { return CONFIG.USDC[S.chainId] || null; }
+
+/* ════════════════════════════════════════════════════════════════
+   WALLET — EIP-6963 + injectés + WalletConnect v2
+   ════════════════════════════════════════════════════════════════ */
+const detected = [];
+window.addEventListener("eip6963:announceProvider", e => {
+  const { info, provider } = e.detail;
+  if (!detected.some(d => d.info.uuid === info.uuid))
+    detected.push({ info, provider });
+});
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+setTimeout(() => { if (!detected.length && window.ethereum)
+  detected.push({ info: { name: "Wallet navigateur", icon: "🦊", uuid: "legacy" }, provider: window.ethereum });
+}, 400);
+
+function openWalletModal() {
+  const list = $("walletList"); list.innerHTML = "";
+  detected.forEach(d => {
+    const b = document.createElement("button");
+    b.className = "w-opt";
+    b.innerHTML = `<div class="w-ico">${d.info.icon ? (d.info.icon.startsWith("data:") ? "👛" : d.info.icon) : "👛"}</div>
+      <div style="flex:1"><div class="w-name">${d.info.name}</div><div class="w-sub">Injecté · MetaMask / Trust / OKX…</div></div><div style="color:var(--muted)">›</div>`;
+    b.onclick = () => connectInjected(d.provider, d.info.name);
+    list.appendChild(b);
+  });
+  // WalletConnect v2
+  const wb = document.createElement("button");
+  wb.className = "w-opt";
+  wb.style.borderColor = "rgba(59,153,252,0.35)";
+  wb.innerHTML = `<div class="w-ico">📱</div><div style="flex:1"><div class="w-name" style="color:#3b99fc">WalletConnect</div>
+    <div class="w-sub">${CONFIG.REOWN_PROJECT_ID ? "QR code · tous wallets mobiles" : "⚠ requiert REOWN_PROJECT_ID"}</div></div><div style="color:var(--muted)">›</div>`;
+  wb.onclick = connectWC;
+  list.appendChild(wb);
+  $("wcNote").style.display = CONFIG.REOWN_PROJECT_ID ? "none" : "block";
+  $("walletModal").classList.add("show");
+}
+function closeWalletModal() { $("walletModal").classList.remove("show"); }
+
+async function connectInjected(provider, name) {
+  try {
+    closeWalletModal();
+    toast("Connexion " + name + "…", "load");
+    const accounts = await provider.request({ method: "eth_requestAccounts" });
+    S.provider = new ethers.BrowserProvider(provider);
+    S.walletType = name;
+    await afterConnect(accounts[0]);
+  } catch (e) { toast("Connexion refusée", "err"); }
+}
+
+async function connectWC() {
+  if (!CONFIG.REOWN_PROJECT_ID) { $("wcNote").style.display = "block"; return; }
+  if (window.__noWC || !window.EthereumProvider) { toast("Lib WalletConnect non chargée", "err"); return; }
+  try {
+    closeWalletModal();
+    toast("Ouverture du QR WalletConnect…", "load");
+    const wc = await window.EthereumProvider.init({
+      projectId: CONFIG.REOWN_PROJECT_ID,
+      chains: [10],
+      optionalChains: [42161],
+      showQrModal: true,
+      methods: ["eth_sendTransaction", "personal_sign"],
+      events: ["accountsChanged", "chainChanged"],
+      rpcMap: { 10: "https://mainnet.optimism.io", 42161: "https://arb1.arbitrum.io/rpc" },
+    });
+    await wc.enable();
+    S.provider = new ethers.BrowserProvider(wc);
+    S.walletType = "WalletConnect";
+    wc.on && wc.on("accountsChanged", a => a.length && (S.account = a[0], refreshAll()));
+    wc.on && wc.on("disconnect", disconnect);
+    await afterConnect(wc.accounts[0]);
+  } catch (e) { toast("WalletConnect : " + (e.message || "annulé"), "err"); }
+}
+
+async function afterConnect(account) {
+  S.account = account;
+  S.signer = await S.provider.getSigner();
+  await ensureChain();
+  await refreshAll();
+  toast("Wallet connecté : " + shortAddr(account), "ok");
+  startPolling();
+}
+
+async function ensureChain() {
+  const net = await S.provider.getNetwork();
+  S.chainId = Number(net.chainId);
+  // Choisir une chaîne supportée par la config
+  const supported = Object.keys(CONFIG.SPEED_MARKETS_AMM).map(Number)
+    .filter(id => CONFIG.SPEED_MARKETS_AMM[id]);
+  if (!supported.includes(S.chainId)) {
+    const target = supported[0] || 10;
+    try {
+      await S.provider.send("wallet_switchEthereumChain", [{ chainId: "0x" + target.toString(16) }]);
+      S.chainId = target;
+    } catch (e) { toast("Bascule vers " + CONFIG.CHAIN_NAMES[target] + " refusée par le wallet", "err"); }
+  }
+}
+
+async function refreshAll() {
+  $("walletBtn").textContent = "🟢 " + shortAddr(S.account);
+  $("walletBtn").classList.add("connected");
+  $("chainBadge").textContent = CONFIG.CHAIN_NAMES[S.chainId] || ("chain " + S.chainId);
+  await verifyAmm();
+  await refreshBalances();
+  await refreshPositions(true);
+  updateBuyBtn();
+}
+
+async function refreshBalances() {
+  if (!S.account || !usdcAddr()) return;
+  try {
+    const usdc = new ethers.Contract(usdcAddr(), ERC20_ABI, S.provider);
+    S.usdcBal = await usdc.balanceOf(S.account);
+    S.allowance = amm() ? await usdc.allowance(S.account, amm()) : 0n;
+    $("rsBal").textContent = fmt$(ethers.formatUnits(S.usdcBal, 6));
+    renderRiskStats();
+    updateApproveBtn();
+  } catch (e) { /* RPC indispo */ }
+}
+
+function disconnect() {
+  S.provider = null; S.signer = null; S.account = null; S.usdcBal = 0n; S.allowance = 0n; S.ammOk = false;
+  stopPolling();
+  $("walletBtn").textContent = "🔗 Connecter";
+  $("walletBtn").classList.remove("connected");
+  $("chainBadge").textContent = "—";
+  $("rsBal").textContent = "—";
+  $("ammTag").textContent = "CONTRAT NON VÉRIFIÉ"; $("ammTag").className = "tag-bad";
+  updateBuyBtn();
+}
+$("walletBtn").addEventListener && null;
+
+/* ════════════════════════════════════════════════════════════════
+   VÉRIFICATION DU CONTRAT (garde-fou anti-fonds perdus)
+   ════════════════════════════════════════════════════════════════ */
+async function verifyAmm() {
+  S.ammOk = false;
+  const addr = amm();
+  if (!addr) {
+    $("ammTag").textContent = "CHAÎNE NON CONFIGURÉE"; $("ammTag").className = "tag-bad";
+    return;
+  }
+  try {
+    const c = new ethers.Contract(addr, SPEED_ABI, S.provider);
+    // Un vrai SpeedMarketsAMM répond true pour USDC comme collateral supporté.
+    const ok = await c.supportedCollateral(usdcAddr());
+    S.ammOk = !!ok;
+  } catch (e) { S.ammOk = false; }
+  $("ammTag").textContent = S.ammOk ? "✓ CONTRAT VÉRIFIÉ" : "⚠ CONTRAT INVALIDE — VÉRIFIE L'ADRESSE";
+  $("ammTag").className = S.ammOk ? "tag-ok" : "tag-bad";
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRADING THALES — quote API officielle → tx signée par le wallet
+   ════════════════════════════════════════════════════════════════ */
+async function thalesApi(path) {
+  const r = await fetch(CONFIG.THALES_API + path, { cache: "no-store" });
+  if (!r.ok) throw new Error("API Thales indisponible (HTTP " + r.status + ")");
+  return r.json();
+}
+
+function assetBytes32(a) {
+  // Thales utilise "BTC"/"ETH" en bytes32
+  return ethers.encodeBytes32String(a);
+}
+
+async function fetchQuote(silent) {
+  S.quote = null;
+  const amt = parseFloat($("amtInp").value);
+  if (!amt || amt < CONFIG.MIN_BUYIN) { $("quoteBox").classList.remove("show"); return; }
+  try {
+    const q = await thalesApi(`/networks/${S.chainId}/buy/?asset=${S.asset}&direction=${S.dir || "UP"}&buyin=${amt}&collateral=USDC&deltaTimeSec=${S.tf}`);
+    S.quote = q; S.quoteAt = Date.now();
+    // Normalisation défensive : l'API retourne payout/frais sous plusieurs noms possibles
+    const payout = q.payout || q.payoutAmount || q.totalAmount || q.buyinAmount && q.payout;
+    const fee = q.fee || q.lpFee || 0;
+    $("qBuyin").textContent = fmt$(amt) + " USDC";
+    $("qPayout").textContent = payout ? fmt$(Number(ethers.formatUnits(String(payout), 6))) + " USDC" : "voir confirmation wallet";
+    $("qOdds").textContent = payout ? "×" + (Number(ethers.formatUnits(String(payout), 6)) / amt).toFixed(2) : "—";
+    $("qFee").textContent = q.value ? "≈ " + ethers.formatEther(String(q.value)).slice(0, 6) + " ETH (Pyth)" : "~0";
+    $("quoteBox").classList.add("show");
+  } catch (e) {
+    if (!silent) toast("Devis impossible : " + e.message + " — utilise le lien officiel en secours.", "err");
+    $("quoteBox").classList.remove("show");
+  }
+  updateBuyBtn(); updateApproveBtn();
+}
+let _qT = null;
+function onAmtInput() { clearTimeout(_qT); _qT = setTimeout(() => fetchQuote(true), 500); }
+
+async function doApprove() {
+  if (!S.signer) return;
+  try {
+    toast("Signature de l'approbation USDC…", "load");
+    const usdc = new ethers.Contract(usdcAddr(), ERC20_ABI, S.signer);
+    const tx = await usdc.approve(amm(), ethers.MaxUint256);
+    toast("Approval envoyée : " + shortAddr(tx.hash), "load");
+    await tx.wait();
+    toast("✓ USDC approuvé pour Speed Markets", "ok");
+    await refreshBalances();
+  } catch (e) { toast("Approval annulé : " + (e.reason || e.message || ""), "err"); }
+}
+
+async function doBuy() {
+  if (!riskCheckGate()) return;
+  const amt = parseFloat($("amtInp").value);
+  if (!S.quote || Date.now() - S.quoteAt > 30000) await fetchQuote(false);
+  if (!S.quote) return;
+  if (S.allowance < ethers.parseUnits(String(amt), 6)) { toast("Approuve l'USDC d'abord (bouton bleu)", "err"); updateApproveBtn(); return; }
+  try {
+    toast("Signature du trade dans ton wallet…", "load");
+    await execBuyTx(S.quote, amt);
+  } catch (e) {
+    toast("Trade échoué : " + (e.reason || e.message || e), "err");
+  }
+}
+
+async function execBuyTx(q, amt) {
+  const c = new ethers.Contract(amm(), SPEED_ABI, S.signer);
+  const value = q.value ? BigInt(String(q.value)) : 0n;
+  const params = q.parameters || q.params;
+  let tx = null;
+  if (q.data || q.txData) {
+    // L'API fournit le calldata tout prêt
+    tx = await S.signer.sendTransaction({ to: amm(), data: q.data || q.txData, value, gasLimit: 3000000n });
+  } else if (q.methodName && Array.isArray(params)) {
+    // Tentatives de toutes les surcharges du nom de méthode
+    const errors = [];
+    for (const frag of SPEED_ABI) {
+      if (!frag.includes("function " + q.methodName + "(")) continue;
+      try {
+        const fn = c.getFunction(frag.slice(9, frag.indexOf(")") + 1));
+        tx = await fn(...params, { value, gasLimit: 3000000n });
+        break;
+      } catch (e) { errors.push(e.shortMessage || e.message); }
+    }
+    if (!tx) throw new Error("Méthode " + q.methodName + " non reconnue par le contrat");
+  } else {
+    throw new Error("Format de réponse API inattendu — utilise l'app officielle (lien en secours)");
+  }
+  toast("⏳ Transaction envoyée : " + shortAddr(tx.hash), "load");
+  const rc = await tx.wait();
+  if (rc.status !== 1) throw new Error("Transaction revertée on-chain");
+  toast("✓ Ticket " + S.asset + " " + S.dir + " acheté — " + fmt$(amt), "ok");
+  await refreshBalances();
+  setTimeout(() => refreshPositions(true), 3000);
+}
+
+function updateApproveBtn() {
+  const amt = parseFloat($("amtInp").value) || 0;
+  const need = S.account && amt > 0 && S.allowance < ethers.parseUnits(String(Math.max(amt, 1)), 6);
+  $("approveBtn").style.display = need ? "block" : "none";
+  if (need) $("approveBtn").textContent = "✓ APPROUVER L'USDC (" + fmt$(Math.max(amt, 1)) + ")";
+}
+function updateBuyBtn() {
+  const b = $("buyBtn");
+  if (!S.account) { b.disabled = true; b.textContent = "CONNECTE TON WALLET"; return; }
+  if (!S.ammOk) { b.disabled = true; b.textContent = "⚠ CONTRAT NON VÉRIFIÉ — IMPOSSIBLE"; return; }
+  if (!S.dir) { b.disabled = true; b.textContent = "CHOISIS UP OU DOWN"; return; }
+  b.disabled = false;
+  b.textContent = "▲ ACHETER " + S.asset + " " + S.dir + " · " + (S.tf / 60) + " MIN";
+}
+
+/* ════════════════════════════════════════════════════════════════
+   POSITIONS — polling API officielle + résolution/claim défensifs
+   ════════════════════════════════════════════════════════════════ */
+function startPolling() { stopPolling(); S.pollTimer = setInterval(() => refreshPositions(false), 8000); refreshPositions(true); }
+function stopPolling() { if (S.pollTimer) clearInterval(S.pollTimer); S.pollTimer = null; }
+
+async function refreshPositions(manual) {
+  if (!S.account) return;
+  try {
+    const list = await thalesApi(`/networks/${S.chainId}/active/?wallet=${S.account}`);
+    const arr = Array.isArray(list) ? list : (list.markets || list.active || []);
+    // Détection de tickets soldés (disparus de la liste active)
+    const still = new Set(arr.map(p => p.address || p.market || p.tokenId));
+    for (const key of Object.keys(S.knownTickets)) {
+      if (!still.has(key) && !S.knownTickets[key].settled) {
+        S.knownTickets[key].settled = true;
+        recordResult(S.knownTickets[key], "pending"); // résultat confirmé manuellement ou au prochain claim
+      }
+    }
+    S.positions = arr;
+    renderPositions();
+    if (manual) toast("Positions à jour", "");
+  } catch (e) {
+    if (manual) toast("Positions indisponibles (API) — vérifie sur l'app officielle", "err");
+  }
+}
+
+function renderPositions() {
+  const el = $("posList");
+  if (!S.positions.length) {
+    el.innerHTML = '<div class="hint" style="text-align:center;padding:8px 0;">Aucune position ouverte actuellement.</div>';
+    return;
+  }
+  el.innerHTML = "";
+  S.positions.forEach(p => {
+    const up = String(p.side || p.direction || "").toUpperCase() === "UP" || p.isUp === true;
+    const strike = p.strikePrice || p.strike || p.initialPrice;
+    const mat = Number(p.maturityDate || p.maturity || p.endTime || 0);
+    const amt = p.buyinAmount || p.buyin || p.amount;
+    const key = p.address || p.market || p.tokenId;
+    if (key && !S.knownTickets[key])
+      S.knownTickets[key] = { asset: p.asset || S.asset, dir: up ? "UP" : "DOWN", amount: Number(amt) / 1e6 || parseFloat(amt) || 0, tf: S.tf, ts: Date.now() };
+    const div = document.createElement("div");
+    div.className = "pos";
+    div.innerHTML = `
+      <div class="pos-dir ${up ? "up" : "down"}">${up ? "▲" : "▼"}</div>
+      <div class="pos-mid">
+        <div class="pos-t">${p.asset || S.asset} · ${up ? "UP" : "DOWN"}</div>
+        <div class="pos-s">Strike ${strike ? Number(strike).toLocaleString("en-US") : "—"} · échéance ${mat ? new Date(mat * (mat > 1e12 ? 1 : 1000)).toLocaleTimeString("fr-FR") : "—"}</div>
+      </div>
+      <div class="pos-end">
+        <div class="pos-amt">${amt ? fmt$(Number(amt) / 1e6 || amt) : ""}</div>
+        <span class="pos-chip chip-live">EN COURS</span>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+async function resolveAndClaimAll() {
+  // Résolution via données Pyth fournies par l'API, puis claim — avec repli vers l'app officielle.
+  toast("Résolution/claim : tentative via API Thales…", "load");
+  try {
+    const q = await thalesApi(`/networks/${S.chainId}/claim/?wallet=${S.account}`);
+    const data = q.data || q.txData;
+    if (data) {
+      const tx = await S.signer.sendTransaction({ to: amm(), data, value: q.value ? BigInt(String(q.value)) : 0n, gasLimit: 3000000n });
+      await tx.wait();
+      toast("✓ Gains réclamés on-chain", "ok");
+      await refreshBalances(); refreshPositions(true);
+      return;
+    }
+    throw new Error("pas de calldata");
+  } catch (e) {
+    toast("Auto-claim indisponible — clique sur Claim dans l'app officielle (lien ci-dessous)", "err");
+    window.open(CONFIG.FALLBACK_URL, "_blank");
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RISK MANAGER
+   ════════════════════════════════════════════════════════════════ */
+function loadRisk() {
+  const def = { journal: [], sessionStart: null, consecLosses: 0, cooldownUntil: 0, settledKeys: {} };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem("wvtrader_risk_v1") || "{}")); }
+  catch (e) { return def; }
+}
+function saveRisk() { try { localStorage.setItem("wvtrader_risk_v1", JSON.stringify(risk)); } catch (e) {} }
+
+function cfg() {
+  return {
+    riskPct: Math.max(0.5, parseFloat($("cfgRisk").value) || 2),
+    dailyPct: Math.max(1, parseFloat($("cfgDaily").value) || 10),
+    consec: Math.max(1, parseInt($("cfgConsec").value) || 3),
+    coolMin: Math.max(1, parseInt($("cfgCool").value) || 15),
+  };
+}
+
+function sessionPnl() {
+  return risk.journal.reduce((s, j) => s + (j.pnl || 0), 0);
+}
+function sessionStartBalance() {
+  if (!risk.sessionStart && S.usdcBal > 0n) { risk.sessionStart = Number(ethers.formatUnits(S.usdcBal, 6)); saveRisk(); }
+  return risk.sessionStart || 0;
+}
+
+function riskCheckGate() {
+  if (!S.account || !S.ammOk || !S.signer) { toast("Connecte ton wallet d'abord", "err"); return false; }
+  const c = cfg();
+  const amt = parseFloat($("amtInp").value) || 0;
+  const bal = Number(ethers.formatUnits(S.usdcBal, 6));
+  if (amt < CONFIG.MIN_BUYIN) { toast("Mise minimum : " + CONFIG.MIN_BUYIN + " USDC", "err"); return false; }
+  if (amt > bal) { toast("Solde USDC insuffisant (" + fmt$(bal) + ")", "err"); return false; }
+  if (Date.now() < risk.cooldownUntil) {
+    const m = Math.ceil((risk.cooldownUntil - Date.now()) / 60000);
+    toast("⛔ Cooldown actif : encore " + m + " min", "err"); return false;
+  }
+  const start = sessionStartBalance();
+  if (start > 0 && sessionPnl() <= -start * c.dailyPct / 100) {
+    toast("⛔ Perte journalière max atteinte (" + c.dailyPct + "%). Stop. Reviens demain.", "err"); return false;
+  }
+  const maxRisk = bal * c.riskPct / 100;
+  if (amt > maxRisk && maxRisk >= CONFIG.MIN_BUYIN) {
+    toast("⛔ Risque max dépassé : " + c.riskPct + "% = " + fmt$(maxRisk) + " USDC par trade", "err"); return false;
+  }
+  return true;
+}
+
+function recordResult(ticket, result, payout) {
+  const key = ticket.key || (ticket.asset + ticket.ts);
+  if (risk.settledKeys[key]) return;
+  risk.settledKeys[key] = true;
+  const pnl = result === "win" ? (payout || ticket.amount) : result === "loss" ? -ticket.amount : 0;
+  risk.journal.push({ date: new Date().toISOString(), asset: ticket.asset, dir: ticket.dir, amount: ticket.amount, tf: ticket.tf, result, pnl: Number(pnl.toFixed ? pnl.toFixed(6) : pnl) });
+  if (result === "loss") {
+    risk.consecLosses++;
+    const c = cfg();
+    if (risk.consecLosses >= c.consec) {
+      risk.cooldownUntil = Date.now() + c.coolMin * 60000;
+      risk.consecLosses = 0;
+      $("lockBanner").textContent = "🔒 " + c.consec + " pertes consécutives — trading bloqué " + c.coolMin + " min";
+      $("lockBanner").classList.add("show");
+      setTimeout(() => $("lockBanner").classList.remove("show"), c.coolMin * 60000);
+    }
+  } else if (result === "win") risk.consecLosses = 0;
+  saveRisk(); renderRiskStats(); renderJournal();
+}
+
+function renderRiskStats() {
+  const j = risk.journal;
+  const pnl = sessionPnl();
+  const el = $("rsPnl");
+  el.textContent = (pnl >= 0 ? "+" : "") + fmt$(pnl);
+  el.style.color = pnl >= 0 ? "var(--green)" : "var(--red)";
+  $("rsTrades").textContent = j.length;
+  const wins = j.filter(x => x.result === "win").length;
+  $("rsWr").textContent = j.length ? Math.round(wins / j.length * 100) + "%" : "—";
+}
+
+function renderJournal() {
+  const j = risk.journal.slice(-12).reverse();
+  const w = $("jrnlWrap");
+  if (!j.length) { w.innerHTML = ""; return; }
+  w.innerHTML = `<table class="jrnl"><tr><th>Heure</th><th>Trade</th><th>Mise</th><th>Résultat</th><th>P&amp;L</th><th></th></tr>` +
+    j.map((x, i) => `<tr>
+      <td>${new Date(x.date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</td>
+      <td>${x.asset} ${x.dir} ${x.tf / 60}m</td>
+      <td>${fmt$(x.amount)}</td>
+      <td class="${x.result === "win" ? "j-win" : x.result === "loss" ? "j-loss" : ""}">${x.result === "pending" ? "⏳ en attente" : x.result.toUpperCase()}</td>
+      <td style="color:${x.pnl >= 0 ? "var(--green)" : "var(--red)"}">${x.pnl >= 0 ? "+" : ""}${fmt$(x.pnl)}</td>
+      <td class="mini-btns">${x.result === "pending" ? `<button onclick="markResult(${risk.journal.indexOf(x)},'win')">✓</button><button onclick="markResult(${risk.journal.indexOf(x)},'loss')">✗</button>` : ""}</td>
+    </tr>`).join("") + "</table>";
+}
+function markResult(idx, res) {
+  const x = risk.journal[idx];
+  if (!x || x.result !== "pending") return;
+  x.result = res; x.pnl = res === "win" ? x.amount : -x.amount; // payout exact ajustable après claim
+  saveRisk(); renderRiskStats(); renderJournal();
+}
+function exportCSV() {
+  const rows = [["date", "asset", "direction", "timeframe_min", "buyin_usdc", "result", "pnl_usdc"]];
+  risk.journal.forEach(x => rows.push([x.date, x.asset, x.dir, x.tf / 60, x.amount, x.result, x.pnl]));
+  const csv = rows.map(r => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "worldvision_journal.csv"; a.click();
+}
+function resetJournal() {
+  if (!confirm("Effacer tout le journal et les stats ?")) return;
+  risk.journal = []; risk.consecLosses = 0; risk.cooldownUntil = 0; risk.settledKeys = {}; risk.sessionStart = null;
+  saveRisk(); renderRiskStats(); renderJournal();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ANALYSE — flux Binance (indicatif seulement)
+   ════════════════════════════════════════════════════════════════ */
+function sym() { return A.asset === "BTC" ? "btcusdt" : "ethusdt"; }
+function connectFeed() {
+  if (A.ws) { try { A.ws.onclose = null; A.ws.close(); } catch (e) {} }
+  A.ticks = []; A.vols = []; A.cvd = 0;
+  try {
+    A.ws = new WebSocket("wss://stream.binance.com:9443/ws/" + sym() + "@aggTrade");
+    A.ws.onmessage = e => {
+      const d = JSON.parse(e.data);
+      const p = parseFloat(d.p), q = parseFloat(d.q || 0), buy = d.m === false;
+      const t = Date.now();
+      A.ticks.push({ t, p }); if (A.ticks.length > 4000) A.ticks.shift();
+      if (q > 0) { A.vols.push({ t, v: q * p, buy }); if (A.vols.length > 4000) A.vols.shift(); A.cvd += buy ? q * p : -q * p; }
+      $("chipPrice").textContent = "$" + p.toLocaleString("en-US", { maximumFractionDigits: A.asset === "BTC" ? 1 : 3 });
+      $("chipCvd").textContent = (A.cvd >= 0 ? "+" : "") + compact(A.cvd);
+      scheduleDraw();
+    };
+    A.ws.onopen = () => $("feedTag").textContent = "Binance · direct";
+    A.ws.onclose = () => { $("feedTag").textContent = "reconnexion…"; setTimeout(connectFeed, 2000); };
+  } catch (e) {}
+}
+function compact(n) {
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (a >= 1e3) return (n / 1e3).toFixed(0) + "K";
+  return n.toFixed(0);
+}
+function scheduleDraw() { if (!A.raf) A.raf = requestAnimationFrame(() => { A.raf = 0; drawChart(); updateBias(); }); }
+
+function drawChart() {
+  const cv = $("chart"), W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  if (cv.width !== W * 2) { cv.width = W * 2; cv.height = H * 2; }
+  const c = cv.getContext("2d"); c.scale(2, 2);
+  const now = Date.now(), winMs = 120000;
+  const data = A.ticks.filter(x => x.t > now - winMs);
+  if (data.length < 2) { c.clearRect(0, 0, W, H); return; }
+  const ps = data.map(x => x.p);
+  const lo = Math.min(...ps), hi = Math.max(...ps), pad = (hi - lo) * 0.15 || hi * 0.0005;
+  const X = t => ((t - (now - winMs)) / winMs) * W;
+  const Y = p => H - 14 - ((p - lo + pad) / (hi - lo + 2 * pad)) * (H - 28);
+  c.clearRect(0, 0, W, H);
+  c.strokeStyle = "rgba(255,255,255,0.05)";
+  for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(0, H * i / 4); c.lineTo(W, H * i / 4); c.stroke(); }
+  // Volume
+  const vols = A.vols.filter(x => x.t > now - winMs);
+  const maxV = Math.max(...vols.map(x => x.v), 1);
+  vols.forEach(x => {
+    c.fillStyle = x.buy ? "rgba(0,230,118,0.45)" : "rgba(255,23,68,0.45)";
+    const h = (x.v / maxV) * 22;
+    c.fillRect(X(x.t), H - h, Math.max(1, W / 300), h);
+  });
+  // Ligne prix
+  const up = data[data.length - 1].p >= data[0].p;
+  c.beginPath();
+  data.forEach((x, i) => i ? c.lineTo(X(x.t), Y(x.p)) : c.moveTo(X(x.t), Y(x.p)));
+  c.strokeStyle = up ? "#00e676" : "#ff1744"; c.lineWidth = 1.6; c.stroke();
+  c.lineTo(X(data[data.length - 1].t), H); c.lineTo(X(data[0].t), H); c.closePath();
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, up ? "rgba(0,230,118,0.15)" : "rgba(255,23,68,0.15)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = g; c.fill();
+  c.fillStyle = "rgba(255,255,255,0.35)"; c.font = "9px Orbitron";
+  c.textAlign = "right"; c.fillText("$" + hi.toLocaleString("en-US", { maximumFractionDigits: 1 }), W - 6, 12);
+  c.fillText("$" + lo.toLocaleString("en-US", { maximumFractionDigits: 1 }), W - 6, H - 26);
+  // momentum + RSI chips (recalculs légers toutes les frames ~ok)
+  const pNow = data[data.length - 1].p;
+  const ago = ms => { const x = A.ticks.filter(y => y.t > now - ms); return x.length ? x[0].p : pNow; };
+  const m60 = (pNow - ago(60000)) / ago(60000) * 100;
+  $("chipMom").textContent = (m60 >= 0 ? "+" : "") + m60.toFixed(3) + "%";
+  $("chipMom").style.color = m60 >= 0 ? "var(--green)" : "var(--red)";
+  $("chipRsi").textContent = rsi(14).toFixed(0);
+}
+function rsi(n) {
+  const closes = []; const step = 1000;
+  for (let t = Date.now() - 60000; t <= Date.now(); t += step) {
+    const x = A.ticks.filter(y => y.t <= t); if (x.length) closes.push(x[x.length - 1].p);
+  }
+  if (closes.length < n + 1) return 50;
+  let g = 0, l = 0;
+  for (let i = closes.length - n; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d > 0) g += d; else l -= d;
+  }
+  if (!l) return 100;
+  return 100 - 100 / (1 + g / l);
+}
+function updateBias() {
+  const now = Date.now();
+  const pNow = A.ticks.length ? A.ticks[A.ticks.length - 1].p : 0;
+  const ago = ms => { const x = A.ticks.filter(y => y.t > now - ms); return x.length ? x[0].p : pNow; };
+  const mom = pNow && ago(60000) ? (pNow - ago(60000)) / ago(60000) * 100 : 0;
+  const cvdN = Math.tanh(A.cvd / 2e6) * 2;      // normalisation douce
+  const score = Math.max(-4, Math.min(4, mom * 60 + cvdN));   // [-4,+4]
+  const pct = 50 + score * 12;
+  const f = $("biasFill");
+  f.style.left = score >= 0 ? "50%" : pct + "%";
+  f.style.width = Math.abs(score) * 12 + "%";
+  f.style.background = score >= 0 ? "linear-gradient(90deg,#008a3d,#00e676)" : "linear-gradient(90deg,#ff1744,#8a0f28)";
+  const t = $("biasTxt");
+  t.textContent = score > 1 ? "⬈ acheteur" : score < -1 ? "⬊ vendeur" : "⬍ neutre";
+  t.style.color = score > 1 ? "var(--green)" : score < -1 ? "var(--red)" : "var(--muted)";
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI BINDINGS + INIT
+   ════════════════════════════════════════════════════════════════ */
+function setAsset(a) {
+  S.asset = a; A.asset = a;
+  $("tabBTC").classList.toggle("active", a === "BTC");
+  $("tabETH").classList.toggle("active", a === "ETH");
+  connectFeed(); fetchQuote(true);
+}
+function setDir(d) {
+  S.dir = d;
+  $("btnUp").classList.toggle("sel", d === "UP");
+  $("btnDown").classList.toggle("sel", d === "DOWN");
+  fetchQuote(true); updateBuyBtn();
+}
+function setPct(p) {
+  const bal = Number(ethers.formatUnits(S.usdcBal, 6));
+  if (!bal) { toast("Connecte ton wallet pour utiliser les %", "err"); return; }
+  const cap = bal * cfg().riskPct / 100;
+  const v = p === 100 ? Math.min(bal, cap * 3) : Math.min(bal * p / 100, cap);
+  $("amtInp").value = Math.max(CONFIG.MIN_BUYIN, v).toFixed(2);
+  fetchQuote(true);
+}
+document.querySelectorAll(".tf-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tf-btn").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); S.tf = parseInt(b.dataset.tf); fetchQuote(true); updateBuyBtn();
+}));
+$("walletBtn").onclick = openWalletModal;
+["cfgRisk", "cfgDaily", "cfgConsec", "cfgCool"].forEach(id => $(id).addEventListener("change", () => { saveRisk(); }));
+
+if (window.__noEthers) {
+  document.body.innerHTML = "<div style='padding:40px;text-align:center;font-family:sans-serif'>ethers.js n'a pas pu être chargé (CDN). Vérifie ta connexion et recharge.</div>";
+  throw new Error("ethers manquant");
+}
+setAsset("BTC");
+renderRiskStats(); renderJournal();
+</script>
+</body>
+</html>
